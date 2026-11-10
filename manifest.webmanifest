@@ -1,0 +1,1 @@
+{"name":"GPS Camera Zambia","short_name":"GPS Camera","start_url":"./","display":"standalone","background_color":"#0b1511","theme_color":"#10251d","description":"Camera app that stamps GPS coordinates, address and altitude on photos.","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}

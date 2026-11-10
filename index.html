@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10251d"><meta name="description" content="GPS Camera Zambia stamps photos with location coordinates, address and altitude.">
+<link rel="manifest" href="manifest.webmanifest">
+<title>GPS Camera Zambia</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}*{box-sizing:border-box}body{margin:0;background:#0b1511;color:#f4f7f4}header{padding:18px 16px;background:#10251d;border-bottom:1px solid #294237}h1{font-size:21px;margin:0}header p{margin:4px 0 0;color:#b8c9bf;font-size:13px}.wrap{max-width:720px;margin:auto;padding:14px}.preview{position:relative;background:#050807;border-radius:16px;overflow:hidden;min-height:250px;display:grid;place-items:center}video{width:100%;height:auto;max-height:62vh;object-fit:cover;display:block}.placeholder{padding:40px 18px;text-align:center;color:#b8c9bf}.overlay{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.42);backdrop-filter:blur(2px);border-radius:10px;padding:10px;font-size:12px;line-height:1.5;pointer-events:none;white-space:pre-line}.panel{background:#14231c;border:1px solid #2b4035;border-radius:14px;padding:14px;margin-top:13px}.data{display:grid;grid-template-columns:1fr 1fr;gap:9px}.cell{background:#0c1711;padding:10px;border-radius:9px;min-width:0}.cell small{display:block;color:#a9bdb0;font-size:11px}.cell strong{font-size:13px;overflow-wrap:anywhere}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}button{border:0;border-radius:10px;padding:13px 15px;font-weight:700;font-size:14px;background:#b5e6c8;color:#10251d;flex:1;min-width:120px}button.secondary{background:#293b31;color:#f3f7f4}button:disabled{opacity:.45}#status{font-size:13px;color:#c3d3c9;line-height:1.5}.note{font-size:12px;color:#a9bdb0;line-height:1.5}canvas{display:none}#result{width:100%;border-radius:12px;margin-top:12px;display:none}.link{color:#b5e6c8}footer{text-align:center;color:#8ea397;font-size:11px;padding:18px}
+</style>
+</head>
+<body>
+<header><h1>📍 GPS Camera Zambia</h1><p>Capture photos with GPS coordinates, address and altitude</p></header>
+<main class="wrap">
+ <div class="preview">
+  <video id="video" autoplay playsinline muted></video>
+  <div class="placeholder" id="placeholder">Camera preview will appear here.<br>Allow camera and location access to begin.</div>
+  <div class="overlay" id="liveOverlay">GPS CAMERA ZAMBIA<br>Waiting for location…</div>
+ </div>
+ <section class="panel">
+  <div class="data">
+   <div class="cell"><small>LATITUDE</small><strong id="lat">Not available</strong></div>
+   <div class="cell"><small>LONGITUDE</small><strong id="lon">Not available</strong></div>
+   <div class="cell"><small>ADDRESS</small><strong id="address">Waiting…</strong></div>
+   <div class="cell"><small>ALTITUDE</small><strong id="altitude">Not available</strong></div>
+  </div>
+  <div class="actions">
+   <button id="start">Start camera & GPS</button>
+   <button id="capture" disabled>Capture photo</button>
+  </div>
+  <div class="actions">
+   <button class="secondary" id="refresh">Refresh location</button>
+   <button class="secondary" id="install" hidden>Install app</button>
+  </div>
+  <p id="status" role="status">For best results, use outdoors with Location set to High accuracy. Internet is needed to look up the street address.</p>
+  <p class="note">Altitude depends on whether your phone supplies a GPS altitude reading. If unavailable, the photo will say “Altitude unavailable” rather than inventing a value.</p>
+ </section>
+ <section class="panel">
+  <strong>Last captured photo</strong>
+  <img id="result" alt="Captured photo with GPS details">
+  <div class="actions"><button id="download" disabled>Save photo</button><button class="secondary" id="share" disabled>Share photo</button></div>
+ </section>
+ <canvas id="canvas"></canvas>
+ <footer>GPS Camera Zambia · Location is added to the photo when you capture it.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let stream=null,position=null,addressText="Address unavailable",photoBlob=null,installPrompt=null;
+function status(t){$("status").textContent=t}
+function dateText(){return new Date().toLocaleString()}
+function altitudeText(){let a=position?.coords?.altitude;return Number.isFinite(a)?`${a.toFixed(1)} m`:"Altitude unavailable"}
+function updateUI(){
+ const c=position?.coords;
+ $("lat").textContent=c?c.latitude.toFixed(6):"Not available";
+ $("lon").textContent=c?c.longitude.toFixed(6):"Not available";
+ $("altitude").textContent=altitudeText();
+ $("address").textContent=addressText;
+ const line=`GPS CAMERA ZAMBIA\nLat: ${c?c.latitude.toFixed(6):"—"}  Lon: ${c?c.longitude.toFixed(6):"—"}\n${addressText}\nAltitude: ${altitudeText()}\n${dateText()}`;
+ $("liveOverlay").textContent=line;
+}
+async function lookupAddress(lat,lon){
+ addressText="Looking up address…";updateUI();
+ try{
+  const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+  if(!r.ok)throw new Error("Address lookup failed");
+  const j=await r.json();addressText=j.display_name||"Address unavailable";
+ }catch(e){addressText="Address unavailable (check internet)";}
+ updateUI();
+}
+function getLocation(){
+ if(!navigator.geolocation){status("This browser does not support GPS location.");return}
+ status("Getting GPS location… Please allow location access.");
+ navigator.geolocation.getCurrentPosition(p=>{
+  position=p;updateUI();lookupAddress(p.coords.latitude,p.coords.longitude);
+  status("GPS location received. Accuracy: "+Math.round(p.coords.accuracy)+" metres.");
+ },e=>{status("Could not get location: "+e.message+". Turn on phone Location and allow this site's location permission.");},{enableHighAccuracy:true,timeout:20000,maximumAge:0});
+}
+async function start(){
+ try{
+  if(!navigator.mediaDevices?.getUserMedia)throw new Error("Camera needs a secure HTTPS website. Open the published Cloudflare Pages address.");
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+  $("video").srcObject=stream;$("placeholder").hidden=true;
+  $("capture").disabled=false;status("Camera started. Point your phone at the subject and capture.");
+  getLocation();
+ }catch(e){status("Camera error: "+e.message+". Check camera permission in Android browser settings.");}
+}
+function drawWrapped(ctx,text,x,y,maxWidth,lineHeight,maxLines=3){
+ let words=String(text).split(/\s+/),line="",lines=[];
+ for(let w of words){let test=line?line+" "+w:w;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=w}else line=test}
+ if(line)lines.push(line);
+ lines=lines.slice(0,maxLines);lines.forEach((l,i)=>ctx.fillText(l,x,y+i*lineHeight));
+ return lines.length*lineHeight;
+}
+function capture(){
+ const v=$("video"),c=$("canvas");if(!v.videoWidth){status("Wait for the camera preview, then try again.");return}
+ if(!position){status("Waiting for GPS. Please refresh location before capturing.");getLocation();return}
+ c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext("2d");ctx.drawImage(v,0,0,c.width,c.height);
+ const scale=c.width/900,fs=Math.max(18,Math.round(22*scale)),pad=Math.round(18*scale),line=Math.round(fs*1.4);
+ const coords=position.coords;
+ const lines=[`GPS CAMERA ZAMBIA`,`Latitude: ${coords.latitude.toFixed(6)}`,`Longitude: ${coords.longitude.toFixed(6)}`,`Address: ${addressText}`,`Altitude: ${altitudeText()}`,`Date: ${dateText()}`];
+ ctx.font=`600 ${fs}px Arial`;const maxW=c.width-pad*2;
+ let addressLines=[];const words=lines[3].split(/\s+/);let current="";
+ for(const w of words){const t=current?current+" "+w:w;if(ctx.measureText(t).width>maxW-24*scale&&current){addressLines.push(current);current=w}else current=t}
+ if(current)addressLines.push(current);addressLines=addressLines.slice(0,3);
+ const finalLines=[...lines.slice(0,3),...addressLines,...lines.slice(4)];
+ const boxH=pad*2+finalLines.length*line;
+ ctx.fillStyle="rgba(0,0,0,.34)";ctx.fillRect(0,c.height-boxH,c.width,boxH);
+ ctx.fillStyle="#fff";ctx.shadowColor="rgba(0,0,0,.85)";ctx.shadowBlur=3*scale;ctx.textBaseline="top";
+ finalLines.forEach((t,i)=>ctx.fillText(t,pad,c.height-boxH+pad+i*line,maxW));
+ c.toBlob(b=>{photoBlob=b;$("result").src=URL.createObjectURL(b);$("result").style.display="block";$("download").disabled=false;$("share").disabled=false;status("Photo captured with GPS details stamped onto it.");},"image/jpeg",.94);
+}
+$("start").addEventListener("click",start);$("capture").addEventListener("click",capture);$("refresh").addEventListener("click",getLocation);
+$("download").addEventListener("click",()=>{if(!photoBlob)return;const a=document.createElement("a");a.href=URL.createObjectURL(photoBlob);a.download=`GPS-Camera-Zambia-${Date.now()}.jpg`;a.click();URL.revokeObjectURL(a.href)});
+$("share").addEventListener("click",async()=>{if(!photoBlob)return;const f=new File([photoBlob],"GPS-Camera-Zambia.jpg",{type:"image/jpeg"});if(navigator.canShare?.({files:[f]})){await navigator.share({files:[f],title:"GPS Camera Zambia photo"})}else status("Photo sharing is not supported here. Use Save photo instead.")});
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installPrompt=e;$("install").hidden=false});
+$("install").addEventListener("click",async()=>{if(!installPrompt)return;installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$("install").hidden=true});
+if("serviceWorker" in navigator && location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
+</script>
+</body></html>
